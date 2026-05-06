@@ -8,3 +8,5 @@ data/frames/
 outputs/
 _video_frames/
 README.local.md
+validation/local_video_labels.csv
+validation/external_images/

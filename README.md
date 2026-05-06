@@ -94,6 +94,24 @@ python main.py path/to/video.mp4 --exclude-edge-panels
 python main.py path/to/video.mp4 --output-dir results
 ```
 
+## Evaluation
+
+If you have labeled images, create a CSV file with this format:
+
+```text
+image_path,expected_count
+validation/images/frame_01.jpg,23
+validation/images/frame_02.jpg,18
+```
+
+Then run:
+
+```bash
+python tools/evaluate_counts.py path/to/labels.csv
+```
+
+The script prints exact match rate, count accuracy, total absolute error, and saves a detailed CSV report.
+
 ## Outputs
 
 For video input, the program creates:
