@@ -94,6 +94,27 @@ python main.py path/to/video.mp4 --exclude-edge-panels
 python main.py path/to/video.mp4 --output-dir results
 ```
 
+### Count unique panels in drone video
+
+For moving drone footage, use unique tracking mode:
+
+```bash
+python main.py path/to/video.mp4 --mode unique --frame-step 10
+```
+
+This mode estimates camera motion between processed frames with OpenCV feature matching and avoids counting the same panel repeatedly while it remains in view.
+
+Useful parameters:
+
+- `--frame-step`: lower values process more frames and improve tracking continuity.
+- `--match-distance`: maximum distance for assigning a detection to an existing tracked panel.
+
+For smooth drone footage, a good starting point is:
+
+```bash
+python main.py path/to/video.mp4 --mode unique --frame-step 10 --match-distance 80
+```
+
 ## Evaluation
 
 If you have labeled images, create a CSV file with this format:
@@ -143,6 +164,14 @@ frame_index,timestamp_seconds,panel_count
 
 For image input, the program saves an annotated image in the selected output directory.
 
+In unique tracking mode, the program creates:
+
+```text
+outputs/
+  tracked_video.mp4
+  unique_panel_counts.csv
+```
+
 ## Configuration
 
 Detection parameters are stored in `DetectionConfig` inside `src/panel_counter/detector.py`.
@@ -169,6 +198,8 @@ The detector works best when:
 - Lighting is not extremely overexposed
 
 It may need parameter tuning for very different panel colors, heavy glare, strong shadows, or low-resolution footage.
+
+Unique video counting assumes that the drone footage is reasonably continuous. Very fast camera motion, abrupt cuts, severe motion blur, or panels disappearing and reappearing after a long time can reduce tracking accuracy.
 
 ## Possible Improvements
 

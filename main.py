@@ -6,6 +6,7 @@ from pathlib import Path
 import cv2
 
 from src.panel_counter import DetectionConfig, SolarPanelDetector
+from src.panel_counter.tracker import process_video_unique
 from src.panel_counter.video import process_video
 
 
@@ -14,6 +15,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("input_path", type=Path, help="Image or video file path.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Directory for results.")
     parser.add_argument("--frame-step", type=int, default=15, help="Process every Nth video frame.")
+    parser.add_argument(
+        "--mode",
+        choices=["frame", "unique"],
+        default="frame",
+        help="Use frame counts or unique panel tracking for video input.",
+    )
+    parser.add_argument(
+        "--match-distance",
+        type=float,
+        default=70.0,
+        help="Maximum pixel distance for matching the same panel in unique mode.",
+    )
     parser.add_argument("--no-video", action="store_true", help="Do not create annotated video output.")
     parser.add_argument(
         "--exclude-edge-panels",
@@ -36,6 +49,22 @@ def main() -> None:
 
     if args.input_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}:
         process_image(args.input_path, args.output_dir, detector)
+        return
+
+    if args.mode == "unique":
+        tracking_results = process_video_unique(
+            video_path=args.input_path,
+            output_dir=args.output_dir,
+            detector=detector,
+            frame_step=args.frame_step,
+            match_distance=args.match_distance,
+            write_video=not args.no_video,
+        )
+        if tracking_results:
+            print(f"Processed frames: {len(tracking_results)}")
+            print(f"Final unique panel count: {tracking_results[-1].unique_count}")
+            print(f"Maximum visible panel count: {max(result.visible_count for result in tracking_results)}")
+        print(f"Results saved to: {args.output_dir.resolve()}")
         return
 
     results = process_video(
