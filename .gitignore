@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+data/frames/
+outputs/
+_video_frames/
+README.local.md
