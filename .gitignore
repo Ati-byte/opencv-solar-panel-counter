@@ -6,6 +6,11 @@ env/
 
 data/frames/
 outputs/
+app_outputs/
+build/
+dist/
+release/
+*.spec
 _video_frames/
 README.local.md
 TEST_REPORT_TR.md

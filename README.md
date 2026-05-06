@@ -54,6 +54,16 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Desktop GUI
+
+Run the Tkinter desktop interface:
+
+```bash
+python app_gui.py
+```
+
+The interface lets you select an image or video, choose frame counting or unique tracking mode, and open the output folder after analysis.
+
 ### Count panels in an image
 
 ```bash
