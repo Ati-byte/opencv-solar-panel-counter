@@ -15,3 +15,10 @@ validation/dense_video_frames/
 validation/external_images/
 validation/kaggle_solar_bboxes/
 validation/kaggle_count_labels.csv
+validation/rwanda_rooftops/
+validation/rwanda_presence_labels.csv
+validation/thermal_solar_pv/
+validation/thermal_presence_labels.csv
+validation/solar_panel_pv_system/
+validation/solarpanels308rgb/
+validation/solarpanels308rgb_positive_labels.csv
