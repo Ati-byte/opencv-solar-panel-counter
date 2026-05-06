@@ -10,3 +10,5 @@ _video_frames/
 README.local.md
 validation/local_video_labels.csv
 validation/external_images/
+validation/kaggle_solar_bboxes/
+validation/kaggle_count_labels.csv

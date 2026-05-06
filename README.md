@@ -112,6 +112,14 @@ python tools/evaluate_counts.py path/to/labels.csv
 
 The script prints exact match rate, count accuracy, total absolute error, and saves a detailed CSV report.
 
+For datasets where annotations represent panel groups instead of individual modules, presence evaluation is usually more appropriate:
+
+```bash
+python tools/evaluate_presence.py path/to/labels.csv --general-scene
+```
+
+This reports whether the image contains at least one detected solar panel region.
+
 ## Outputs
 
 For video input, the program creates:
@@ -167,5 +175,4 @@ It may need parameter tuning for very different panel colors, heavy glare, stron
 - Add a simple desktop or web interface
 - Add frame preview and parameter controls
 - Use object tracking to avoid counting the same panel across multiple video frames
-- Add a YOLO-based detector for more varied scenes
 - Generate summary charts from the CSV output
