@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,8 @@ from src.panel_counter.video import process_video
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+WINDOW_TITLE = "OpenCV Solar Panel Counter - Ethem SARNIÇLI"
+WINDOW_ICON = Path("assets") / "window_icon.ico"
 
 
 class AnalysisResult(NamedTuple):
@@ -44,7 +47,8 @@ class AnalysisResult(NamedTuple):
 class SolarPanelCounterApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
-        self.root.title("OpenCV Solar Panel Counter")
+        self.root.title(WINDOW_TITLE)
+        self._set_window_icon()
         self.root.geometry("760x520")
         self.root.minsize(720, 500)
 
@@ -57,6 +61,11 @@ class SolarPanelCounterApp:
         self.last_output_dir: Path | None = None
 
         self._build_layout()
+
+    def _set_window_icon(self) -> None:
+        icon_path = resource_path(WINDOW_ICON)
+        if icon_path.exists():
+            self.root.iconbitmap(str(icon_path))
 
     def _build_layout(self) -> None:
         container = Frame(self.root, padx=18, pady=16)
@@ -268,6 +277,12 @@ def main() -> None:
     root = Tk()
     SolarPanelCounterApp(root)
     root.mainloop()
+
+
+def resource_path(relative_path: Path) -> Path:
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / relative_path
+    return Path(__file__).resolve().parent / relative_path
 
 
 if __name__ == "__main__":
