@@ -45,8 +45,6 @@ def main() -> None:
     if not args.input_path.exists():
         raise FileNotFoundError(f"Input file not found: {args.input_path}")
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-
     if args.input_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}:
         process_image(args.input_path, args.output_dir, detector)
         return
@@ -64,7 +62,10 @@ def main() -> None:
             print(f"Processed frames: {len(tracking_results)}")
             print(f"Final unique panel count: {tracking_results[-1].unique_count}")
             print(f"Maximum visible panel count: {max(result.visible_count for result in tracking_results)}")
-        print(f"Results saved to: {args.output_dir.resolve()}")
+            if tracking_results[-1].unique_count > 0:
+                print(f"Results saved to: {args.output_dir.resolve()}")
+            else:
+                print("No output folder was created because no panels were detected.")
         return
 
     results = process_video(
@@ -81,7 +82,10 @@ def main() -> None:
         print(f"Minimum panel count: {min(counts)}")
         print(f"Maximum panel count: {max(counts)}")
         print(f"Average panel count: {sum(counts) / len(counts):.2f}")
-    print(f"Results saved to: {args.output_dir.resolve()}")
+        if max(counts) > 0:
+            print(f"Results saved to: {args.output_dir.resolve()}")
+        else:
+            print("No output folder was created because no panels were detected.")
 
 
 def process_image(image_path: Path, output_dir: Path, detector: SolarPanelDetector) -> None:
@@ -90,12 +94,17 @@ def process_image(image_path: Path, output_dir: Path, detector: SolarPanelDetect
         raise ValueError(f"Could not read image: {image_path}")
 
     detections = detector.detect(image)
+    print(f"Detected panels: {len(detections)}")
+    if not detections:
+        print("No output folder was created because no panels were detected.")
+        return
+
+    output_dir.mkdir(parents=True, exist_ok=True)
     annotated_image = detector.annotate(image, detections)
 
     output_path = output_dir / f"{image_path.stem}_annotated.jpg"
     cv2.imwrite(str(output_path), annotated_image)
 
-    print(f"Detected panels: {len(detections)}")
     print(f"Annotated image saved to: {output_path.resolve()}")
 
 

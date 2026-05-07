@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,49 +32,54 @@ def process_video(
     if not capture.isOpened():
         raise FileNotFoundError(f"Could not open video: {video_path}")
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     fps = capture.get(cv2.CAP_PROP_FPS) or 30
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     video_writer = None
+    temp_video_path: Path | None = None
 
-    if write_video:
-        output_video_path = output_dir / "annotated_video.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        video_writer = cv2.VideoWriter(str(output_video_path), fourcc, fps / frame_step, (width, height))
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if write_video:
+            temp_video_path = Path(temp_dir) / "annotated_video.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            video_writer = cv2.VideoWriter(str(temp_video_path), fourcc, fps / frame_step, (width, height))
 
-    results: list[FrameResult] = []
-    frame_index = 0
+        results: list[FrameResult] = []
+        frame_index = 0
 
-    while True:
-        success, frame = capture.read()
-        if not success:
-            break
+        while True:
+            success, frame = capture.read()
+            if not success:
+                break
 
-        if frame_index % frame_step == 0:
-            detections = detector.detect(frame)
-            annotated_frame = detector.annotate(frame, detections)
-            timestamp = frame_index / fps
-            results.append(
-                FrameResult(
-                    frame_index=frame_index,
-                    timestamp_seconds=round(timestamp, 3),
-                    panel_count=len(detections),
+            if frame_index % frame_step == 0:
+                detections = detector.detect(frame)
+                annotated_frame = detector.annotate(frame, detections)
+                timestamp = frame_index / fps
+                results.append(
+                    FrameResult(
+                        frame_index=frame_index,
+                        timestamp_seconds=round(timestamp, 3),
+                        panel_count=len(detections),
+                    )
                 )
-            )
 
-            if video_writer is not None:
-                video_writer.write(annotated_frame)
+                if video_writer is not None:
+                    video_writer.write(annotated_frame)
 
-        frame_index += 1
+            frame_index += 1
 
-    capture.release()
-    if video_writer is not None:
-        video_writer.release()
+        capture.release()
+        if video_writer is not None:
+            video_writer.release()
 
-    write_results_csv(results, output_dir / "panel_counts.csv")
-    return results
+        if max((result.panel_count for result in results), default=0) > 0:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            write_results_csv(results, output_dir / "panel_counts.csv")
+            if temp_video_path is not None and temp_video_path.exists():
+                shutil.move(str(temp_video_path), str(output_dir / "annotated_video.mp4"))
+
+        return results
 
 
 def write_results_csv(results: list[FrameResult], csv_path: Path) -> None:

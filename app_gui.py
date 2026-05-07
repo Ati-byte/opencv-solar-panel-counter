@@ -24,6 +24,7 @@ from tkinter import (
     messagebox,
 )
 from tkinter.ttk import Progressbar
+from typing import NamedTuple
 
 import cv2
 
@@ -33,6 +34,11 @@ from src.panel_counter.video import process_video
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+
+class AnalysisResult(NamedTuple):
+    message: str
+    output_dir: Path | None
 
 
 class SolarPanelCounterApp:
@@ -155,7 +161,7 @@ class SolarPanelCounterApp:
             )
 
             if input_path.suffix.lower() in IMAGE_EXTENSIONS:
-                result_message = self._process_image(input_path, output_dir, detector)
+                analysis_result = self._process_image(input_path, output_dir, detector)
             elif self.mode.get() == "unique":
                 results = process_video_unique(
                     video_path=input_path,
@@ -173,6 +179,10 @@ class SolarPanelCounterApp:
                     f"Total unique panel count: {final_count}\n"
                     f"Maximum visible panel count: {max_visible}"
                 )
+                if final_count == 0:
+                    result_message += "\nNo output folder was created because no panels were detected."
+                    output_dir = None
+                analysis_result = AnalysisResult(result_message, output_dir)
             else:
                 results = process_video(
                     video_path=input_path,
@@ -190,8 +200,12 @@ class SolarPanelCounterApp:
                     f"Maximum panel count: {max(counts) if counts else 0}\n"
                     f"Average panel count: {average:.2f}"
                 )
+                if max(counts, default=0) == 0:
+                    result_message += "\nNo output folder was created because no panels were detected."
+                    output_dir = None
+                analysis_result = AnalysisResult(result_message, output_dir)
 
-            self.root.after(0, self._show_success, output_dir, result_message)
+            self.root.after(0, self._show_success, analysis_result)
         except Exception as exc:
             self.root.after(0, self._show_error, str(exc))
 
@@ -200,22 +214,29 @@ class SolarPanelCounterApp:
         image_path: Path,
         output_dir: Path,
         detector: SolarPanelDetector,
-    ) -> str:
-        output_dir.mkdir(parents=True, exist_ok=True)
+    ) -> AnalysisResult:
         image = cv2.imread(str(image_path))
         if image is None:
             raise ValueError(f"Could not read image: {image_path}")
 
         detections = detector.detect(image)
+        if not detections:
+            return AnalysisResult(
+                "Image analysis completed.\nDetected panels: 0\nNo output folder was created because no panels were detected.",
+                None,
+            )
+
+        output_dir.mkdir(parents=True, exist_ok=True)
         annotated = detector.annotate(image, detections)
         output_path = output_dir / f"{image_path.stem}_annotated.jpg"
         cv2.imwrite(str(output_path), annotated)
-        return f"Image analysis completed.\nDetected panels: {len(detections)}"
+        return AnalysisResult(f"Image analysis completed.\nDetected panels: {len(detections)}", output_dir)
 
-    def _show_success(self, output_dir: Path, message: str) -> None:
-        self.last_output_dir = output_dir.resolve()
-        self.status.set(message)
-        self._set_output_text(str(self.last_output_dir))
+    def _show_success(self, result: AnalysisResult) -> None:
+        self.last_output_dir = result.output_dir.resolve() if result.output_dir is not None else None
+        self.status.set(result.message)
+        output_text = str(self.last_output_dir) if self.last_output_dir is not None else "No output folder created."
+        self._set_output_text(output_text)
         self._set_running(False)
 
     def _show_error(self, message: str) -> None:

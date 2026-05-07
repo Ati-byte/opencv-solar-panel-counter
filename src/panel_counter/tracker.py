@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -228,55 +230,62 @@ def process_video_unique(
     if not capture.isOpened():
         raise FileNotFoundError(f"Could not open video: {video_path}")
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     fps = capture.get(cv2.CAP_PROP_FPS) or 30
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     video_writer = None
-    if write_video:
-        output_video_path = output_dir / "tracked_video.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        video_writer = cv2.VideoWriter(str(output_video_path), fourcc, fps / frame_step, (width, height))
+    temp_video_path: Path | None = None
 
-    motion = CameraMotionEstimator()
-    tracker = ActivePanelTracker(match_distance=match_distance)
-    results: list[TrackingFrameResult] = []
-    frame_index = 0
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if write_video:
+            temp_video_path = Path(temp_dir) / "tracked_video.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            video_writer = cv2.VideoWriter(str(temp_video_path), fourcc, fps / frame_step, (width, height))
 
-    while True:
-        success, frame = capture.read()
-        if not success:
-            break
+        motion = CameraMotionEstimator()
+        tracker = ActivePanelTracker(match_distance=match_distance)
+        results: list[TrackingFrameResult] = []
+        frame_index = 0
 
-        if frame_index % frame_step == 0:
-            previous_to_current = motion.update(frame)
-            detections = detector.detect(frame)
-            assignments, matched_count, new_count = tracker.update(frame_index, detections, previous_to_current)
-            timestamp = frame_index / fps
+        while True:
+            success, frame = capture.read()
+            if not success:
+                break
 
-            results.append(
-                TrackingFrameResult(
-                    frame_index=frame_index,
-                    timestamp_seconds=round(timestamp, 3),
-                    visible_count=len(detections),
-                    unique_count=tracker.unique_count,
-                    matched_count=matched_count,
-                    new_count=new_count,
+            if frame_index % frame_step == 0:
+                previous_to_current = motion.update(frame)
+                detections = detector.detect(frame)
+                assignments, matched_count, new_count = tracker.update(frame_index, detections, previous_to_current)
+                timestamp = frame_index / fps
+
+                results.append(
+                    TrackingFrameResult(
+                        frame_index=frame_index,
+                        timestamp_seconds=round(timestamp, 3),
+                        visible_count=len(detections),
+                        unique_count=tracker.unique_count,
+                        matched_count=matched_count,
+                        new_count=new_count,
+                    )
                 )
-            )
 
-            if video_writer is not None:
-                video_writer.write(annotate_tracked_frame(frame, assignments, tracker.unique_count))
+                if video_writer is not None:
+                    video_writer.write(annotate_tracked_frame(frame, assignments, tracker.unique_count))
 
-        frame_index += 1
+            frame_index += 1
 
-    capture.release()
-    if video_writer is not None:
-        video_writer.release()
+        capture.release()
+        if video_writer is not None:
+            video_writer.release()
 
-    write_tracking_csv(results, output_dir / "unique_panel_counts.csv")
-    return results
+        if results and results[-1].unique_count > 0:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            write_tracking_csv(results, output_dir / "unique_panel_counts.csv")
+            if temp_video_path is not None and temp_video_path.exists():
+                shutil.move(str(temp_video_path), str(output_dir / "tracked_video.mp4"))
+
+        return results
 
 
 def annotate_tracked_frame(
