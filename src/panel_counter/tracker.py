@@ -300,10 +300,10 @@ def annotate_tracked_frame(
             cv2.LINE_AA,
         )
 
-    cv2.rectangle(output, (10, 10), (320, 52), (0, 0, 0), -1)
+    cv2.rectangle(output, (10, 10), (390, 52), (0, 0, 0), -1)
     cv2.putText(
         output,
-        f"Unique panels: {unique_count}",
+        f"Total unique panels: {unique_count}",
         (20, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.78,

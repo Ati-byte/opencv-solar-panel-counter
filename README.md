@@ -106,13 +106,13 @@ python main.py path/to/video.mp4 --output-dir results
 
 ### Count unique panels in drone video
 
-For moving drone footage, use unique tracking mode:
+For moving drone footage, use total unique tracking mode:
 
 ```bash
 python main.py path/to/video.mp4 --mode unique --frame-step 10
 ```
 
-This mode estimates camera motion between processed frames with OpenCV feature matching and avoids counting the same panel repeatedly while it remains in view.
+This mode estimates camera motion between processed frames with OpenCV feature matching and avoids counting the same panel repeatedly while it remains in view. This is the correct mode when you need the total number of panels seen during the video.
 
 Useful parameters:
 

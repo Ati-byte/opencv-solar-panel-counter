@@ -43,7 +43,7 @@ class SolarPanelCounterApp:
         self.root.minsize(720, 500)
 
         self.input_path = StringVar()
-        self.mode = StringVar(value="frame")
+        self.mode = StringVar(value="unique")
         self.edge_mode = StringVar(value="include")
         self.frame_step = StringVar(value="10")
         self.match_distance = StringVar(value="80")
@@ -68,8 +68,17 @@ class SolarPanelCounterApp:
         mode_row = Frame(options)
         mode_row.pack(fill=X)
         Label(mode_row, text="Video mode:", width=16, anchor="w").pack(side=LEFT)
-        Radiobutton(mode_row, text="Frame count", variable=self.mode, value="frame").pack(side=LEFT)
-        Radiobutton(mode_row, text="Unique tracking", variable=self.mode, value="unique").pack(side=LEFT, padx=(16, 0))
+        Radiobutton(mode_row, text="Total unique count", variable=self.mode, value="unique").pack(side=LEFT)
+        Radiobutton(mode_row, text="Current frame count", variable=self.mode, value="frame").pack(side=LEFT, padx=(16, 0))
+
+        hint_row = Frame(options)
+        hint_row.pack(fill=X, pady=(6, 0))
+        Label(
+            hint_row,
+            text="Use Total unique count for drone videos. Current frame count only counts panels visible at that moment.",
+            anchor="w",
+            justify=LEFT,
+        ).pack(side=LEFT, fill=X, expand=True)
 
         edge_row = Frame(options)
         edge_row.pack(fill=X, pady=(8, 0))
@@ -159,9 +168,9 @@ class SolarPanelCounterApp:
                 final_count = results[-1].unique_count if results else 0
                 max_visible = max((result.visible_count for result in results), default=0)
                 result_message = (
-                    f"Unique tracking completed.\n"
+                    f"Total unique count completed.\n"
                     f"Processed frames: {len(results)}\n"
-                    f"Final unique panel count: {final_count}\n"
+                    f"Total unique panel count: {final_count}\n"
                     f"Maximum visible panel count: {max_visible}"
                 )
             else:
@@ -175,7 +184,7 @@ class SolarPanelCounterApp:
                 counts = [result.panel_count for result in results]
                 average = sum(counts) / len(counts) if counts else 0
                 result_message = (
-                    f"Frame count completed.\n"
+                    f"Current frame count completed.\n"
                     f"Processed frames: {len(results)}\n"
                     f"Minimum panel count: {min(counts) if counts else 0}\n"
                     f"Maximum panel count: {max(counts) if counts else 0}\n"
