@@ -10,9 +10,5 @@ app_outputs/
 build/
 dist/
 release/
-assets/
-*.spec
 _video_frames/
-README.local.md
-TEST_REPORT_TR.md
 validation/
