@@ -141,7 +141,7 @@ class SolarPanelDetector:
         image_shape: tuple[int, int, int],
     ) -> bool:
         image_height, image_width = image_shape[:2]
-        return x <= 2 or y <= 2 or x + width >= image_width - 2 or y + height >= image_height - 2
+        return x <= 1 or y <= 1 or x + width >= image_width - 1 or y + height >= image_height - 1
 
     def _non_maximum_suppression(self, detections: list[PanelDetection]) -> list[PanelDetection]:
         selected: list[PanelDetection] = []
