@@ -20,6 +20,7 @@ class TrackedPanel:
     first_frame: int
     last_frame: int
     hits: int
+    confirmed: bool
 
 
 @dataclass(frozen=True)
@@ -33,16 +34,22 @@ class TrackingFrameResult:
 
 
 class ActivePanelTracker:
-    def __init__(self, match_distance: float = 65.0, max_missing_frames: int = 4) -> None:
+    def __init__(
+        self,
+        match_distance: float = 65.0,
+        max_missing_frames: int = 4,
+        min_confirmed_hits: int = 3,
+    ) -> None:
         self.match_distance = match_distance
         self.max_missing_frames = max_missing_frames
+        self.min_confirmed_hits = min_confirmed_hits
         self._next_panel_id = 1
         self._panels: list[TrackedPanel] = []
-        self._unique_count = 0
+        self._confirmed_count = 0
 
     @property
     def unique_count(self) -> int:
-        return self._unique_count
+        return self._confirmed_count
 
     def update(
         self,
@@ -56,27 +63,36 @@ class ActivePanelTracker:
         matched_pairs = self._match_detections(detection_centers)
         matched_detection_indices = {detection_index for detection_index, _ in matched_pairs}
         assignments: list[tuple[PanelDetection, int]] = []
+        new_count = 0
 
         for detection_index, panel_index in matched_pairs:
             center = detection_centers[detection_index]
             panel = self._panels[panel_index]
+            hits = panel.hits + 1
+            confirmed = panel.confirmed or hits >= self.min_confirmed_hits
+            if confirmed and not panel.confirmed:
+                new_count += 1
+                self._confirmed_count += 1
+
             updated_panel = TrackedPanel(
                 panel_id=panel.panel_id,
-                x=(panel.x * panel.hits + float(center[0])) / (panel.hits + 1),
-                y=(panel.y * panel.hits + float(center[1])) / (panel.hits + 1),
+                x=(panel.x * panel.hits + float(center[0])) / hits,
+                y=(panel.y * panel.hits + float(center[1])) / hits,
                 first_frame=panel.first_frame,
                 last_frame=frame_index,
-                hits=panel.hits + 1,
+                hits=hits,
+                confirmed=confirmed,
             )
             self._panels[panel_index] = updated_panel
-            assignments.append((detections[detection_index], panel.panel_id))
+            if confirmed:
+                assignments.append((detections[detection_index], panel.panel_id))
 
-        new_count = 0
         for detection_index, detection in enumerate(detections):
             if detection_index in matched_detection_indices:
                 continue
 
             center = detection_centers[detection_index]
+            confirmed = self.min_confirmed_hits <= 1
             panel = TrackedPanel(
                 panel_id=self._next_panel_id,
                 x=float(center[0]),
@@ -84,12 +100,14 @@ class ActivePanelTracker:
                 first_frame=frame_index,
                 last_frame=frame_index,
                 hits=1,
+                confirmed=confirmed,
             )
             self._panels.append(panel)
-            assignments.append((detection, panel.panel_id))
             self._next_panel_id += 1
-            self._unique_count += 1
-            new_count += 1
+            if confirmed:
+                self._confirmed_count += 1
+                new_count += 1
+                assignments.append((detection, panel.panel_id))
 
         self._panels = [
             panel
@@ -110,6 +128,7 @@ class ActivePanelTracker:
                     first_frame=panel.first_frame,
                     last_frame=panel.last_frame,
                     hits=panel.hits,
+                    confirmed=panel.confirmed,
                 )
             )
         self._panels = predicted
@@ -244,7 +263,13 @@ def process_video_unique(
             video_writer = cv2.VideoWriter(str(temp_video_path), fourcc, fps / frame_step, (width, height))
 
         motion = CameraMotionEstimator()
-        tracker = ActivePanelTracker(match_distance=match_distance)
+        # A panel must be visible for ~1 s to be confirmed; scale with frame_step and fps.
+        min_confirmed_hits = max(2, round(fps / frame_step))
+        tracker = ActivePanelTracker(
+            match_distance=match_distance,
+            max_missing_frames=frame_step * 4,
+            min_confirmed_hits=min_confirmed_hits,
+        )
         results: list[TrackingFrameResult] = []
         frame_index = 0
 
