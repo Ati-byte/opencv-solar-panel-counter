@@ -1,50 +1,52 @@
 # OpenCV Solar Panel Counter
 
-This project detects and counts visible solar panels in images and videos using classical computer vision methods with OpenCV.
+Detects and counts visible solar panels in images and drone videos using classical computer vision with OpenCV. No machine learning model required.
 
-The detector is designed for aerial or top-angle footage where solar panels have visible blue surfaces and clear frame boundaries.
+Designed for aerial or top-angle footage where panels have visible blue surfaces and clear frame boundaries.
 
 ## Features
 
-- Counts solar panels in a single image
-- Processes video files frame by frame
-- Draws rotated bounding boxes around detected panels
-- Saves an annotated output video
-- Exports per-frame panel counts to CSV
-- Supports ignoring panels that touch the image border
+- Single-image panel detection with annotated output
+- Per-frame panel counting for video
+- **Unique panel tracking** across drone video — counts each physical panel once
+- Camera motion compensation between frames (ORB feature matching + affine estimation)
+- Rotated bounding boxes fitted to each panel contour
+- Border panel exclusion — ignore panels partially cut off at the frame edge
+- Automatic frame step calibration based on video FPS
+- Annotated output video and per-frame CSV export
+- Desktop GUI (Tkinter)
 
 ## How It Works
 
-The project uses a rule-based image processing pipeline:
+The pipeline is fully rule-based:
 
-1. Read the input image or video frame with OpenCV.
-2. Convert the frame from BGR to HSV color space.
-3. Segment blue solar panel regions with an HSV color threshold.
-4. Remove small noise with morphological operations.
-5. Find panel candidates using contour detection.
-6. Filter candidates by area, width, height, fill ratio, and aspect ratio.
-7. Draw rotated boxes around the remaining detections.
-8. Count the detections and save the result.
-
-This approach does not require a trained machine learning model. It works best when the panel color and panel boundaries are visually clear.
+1. Convert each frame from BGR to HSV color space.
+2. Threshold the HSV image to isolate blue solar panel regions.
+3. Apply morphological opening to remove small noise.
+4. Extract contours and filter candidates by area ratio, fill ratio, and aspect ratio.
+5. Apply non-maximum suppression to remove overlapping detections.
+6. Merge small adjacent cell-level detections into single panel detections.
+7. In unique tracking mode, estimate camera motion between processed frames and track panel identities across the video to count each panel exactly once.
 
 ## Project Structure
 
 ```text
 opencv-solar-panel-counter/
-  main.py
+  app_gui.py            # Desktop GUI entry point
+  main.py               # CLI entry point
   requirements.txt
-  README.md
   src/
     panel_counter/
       __init__.py
-      detector.py
-      video.py
+      detector.py       # Detection pipeline and DetectionConfig
+      tracker.py        # Unique panel tracker and camera motion estimator
+      video.py          # Per-frame video processing
+  tools/
+    evaluate_counts.py  # Count accuracy evaluation against labeled CSV
+    evaluate_presence.py
 ```
 
 ## Installation
-
-Clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/Ati-byte/opencv-solar-panel-counter.git
@@ -56,47 +58,39 @@ pip install -r requirements.txt
 
 ### Desktop GUI
 
-Run the Tkinter desktop interface:
-
 ```bash
 python app_gui.py
 ```
 
-The interface lets you select an image or video, choose frame counting or unique tracking mode, and open the output folder after analysis.
+Select an image or video, choose the analysis mode, set border panel behavior, and click **Analyze**. The frame step field is populated automatically from the video FPS when a file is selected.
 
-### Count panels in an image
+### CLI — count panels in an image
 
 ```bash
 python main.py path/to/image.jpg
 ```
 
-The annotated image is saved in the `outputs` directory.
-
-### Count panels in a video
+### CLI — count panels in a video (per-frame mode)
 
 ```bash
-python main.py path/to/video.mp4
+python main.py path/to/video.mp4 --frame-step 10
 ```
 
-By default, the program processes every 15th frame. For more frequent analysis, use `--frame-step`:
+### CLI — count unique panels in drone video
 
 ```bash
-python main.py path/to/video.mp4 --frame-step 5
+python main.py path/to/video.mp4 --mode unique --frame-step 10 --match-distance 80
 ```
 
-To process every frame:
-
-```bash
-python main.py path/to/video.mp4 --frame-step 1
-```
+This mode tracks panels across frames and counts each physical panel once, even as the drone moves. Recommended for any footage where the camera is in motion over a panel field.
 
 ### Ignore border panels
 
-Panels that touch the image border are included by default. To ignore partial panels near the frame edges:
-
 ```bash
-python main.py path/to/video.mp4 --exclude-edge-panels
+python main.py path/to/video.mp4 --mode unique --exclude-edge-panels
 ```
+
+Panels whose bounding box touches the frame edge are excluded. Use this when you want to count only fully visible panels.
 
 ### Custom output directory
 
@@ -104,35 +98,45 @@ python main.py path/to/video.mp4 --exclude-edge-panels
 python main.py path/to/video.mp4 --output-dir results
 ```
 
-### Count unique panels in drone video
+## Frame Step
 
-For moving drone footage, use total unique tracking mode:
+`--frame-step N` processes one out of every N frames. A smaller value gives more tracking samples but increases processing time.
 
-```bash
-python main.py path/to/video.mp4 --mode unique --frame-step 10
+The recommended value is `fps / 3` — for a 30 FPS video that is 10, for 60 FPS it is 20. The GUI sets this automatically when a video is loaded. The tracker's confirmation threshold also scales with the frame step so that a panel must be observed for approximately one second of real time before it is counted.
+
+## Outputs
+
+**Image input:**
+
+```text
+outputs/
+  image_annotated.jpg
 ```
 
-This mode estimates camera motion between processed frames with OpenCV feature matching and avoids counting the same panel repeatedly while it remains in view. This is the correct mode when you need the total number of panels seen during the video.
+**Video — per-frame mode:**
 
-Useful parameters:
+```text
+outputs/
+  annotated_video.mp4
+  panel_counts.csv        # frame_index, timestamp_seconds, panel_count
+```
 
-- `--frame-step`: lower values process more frames and improve tracking continuity.
-- `--match-distance`: maximum distance for assigning a detection to an existing tracked panel.
+**Video — unique tracking mode:**
 
-For smooth drone footage, a good starting point is:
-
-```bash
-python main.py path/to/video.mp4 --mode unique --frame-step 10 --match-distance 80
+```text
+outputs/
+  tracked_video.mp4
+  unique_panel_counts.csv # frame_index, timestamp_seconds, visible_count, unique_count, ...
 ```
 
 ## Evaluation
 
-If you have labeled images, create a CSV file with this format:
+Create a CSV file with expected counts:
 
 ```text
 image_path,expected_count
-validation/images/frame_01.jpg,23
-validation/images/frame_02.jpg,18
+validation/frame_01.jpg,23
+validation/frame_02.jpg,18
 ```
 
 Then run:
@@ -141,79 +145,27 @@ Then run:
 python tools/evaluate_counts.py path/to/labels.csv
 ```
 
-The script prints exact match rate, count accuracy, total absolute error, and saves a detailed CSV report.
-
-For datasets where annotations represent panel groups instead of individual modules, presence evaluation is usually more appropriate:
-
-```bash
-python tools/evaluate_presence.py path/to/labels.csv --general-scene
-```
-
-This reports whether the image contains at least one detected solar panel region.
-
-## Outputs
-
-For video input, the program creates:
-
-```text
-outputs/
-  annotated_video.mp4
-  panel_counts.csv
-```
-
-`annotated_video.mp4` contains the processed video with detected panels marked.
-
-`panel_counts.csv` contains frame-level count data:
-
-```text
-frame_index,timestamp_seconds,panel_count
-0,0.0,18
-15,0.5,19
-30,1.0,20
-```
-
-For image input, the program saves an annotated image in the selected output directory.
-
-In unique tracking mode, the program creates:
-
-```text
-outputs/
-  tracked_video.mp4
-  unique_panel_counts.csv
-```
+Reports exact match rate, count accuracy, and total absolute error.
 
 ## Configuration
 
-Detection parameters are stored in `DetectionConfig` inside `src/panel_counter/detector.py`.
+Detection parameters are defined in `DetectionConfig` inside `src/panel_counter/detector.py`:
 
-Important parameters include:
-
-- `lower_hsv` and `upper_hsv`: HSV color range for panel segmentation
-- `min_area_ratio` and `max_area_ratio`: accepted candidate size range
-- `min_fill_ratio`: how much of a candidate box must be filled by the detected mask
-- `min_aspect_ratio` and `max_aspect_ratio`: accepted panel shape range
-- `include_edge_panels`: whether border-touching panels are counted
-
-These values can be tuned for different camera angles, lighting conditions, or panel colors.
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `lower_hsv` | `(90, 70, 30)` | Lower HSV bound for panel segmentation |
+| `upper_hsv` | `(130, 255, 245)` | Upper HSV bound for panel segmentation |
+| `min_area_ratio` | `0.004` | Minimum panel area as fraction of frame area |
+| `max_area_ratio` | `0.22` | Maximum panel area as fraction of frame area |
+| `min_fill_ratio` | `0.30` | Minimum contour fill of the bounding box |
+| `min_aspect_ratio` | `0.25` | Minimum width/height ratio |
+| `max_aspect_ratio` | `2.50` | Maximum width/height ratio |
+| `include_edge_panels` | `True` | Whether to count panels touching the frame edge |
+| `nms_iou_threshold` | `0.20` | IoU threshold for non-maximum suppression |
 
 ## Limitations
 
-This is a classical computer vision solution, so performance depends on the visual quality of the input.
-
-The detector works best when:
-
-- Panels are blue or dark blue
-- The camera angle is from above or near above
-- Panel borders are visible
-- Lighting is not extremely overexposed
-
-It may need parameter tuning for very different panel colors, heavy glare, strong shadows, or low-resolution footage.
-
-Unique video counting assumes that the drone footage is reasonably continuous. Very fast camera motion, abrupt cuts, severe motion blur, or panels disappearing and reappearing after a long time can reduce tracking accuracy.
-
-## Possible Improvements
-
-- Add a simple desktop or web interface
-- Add frame preview and parameter controls
-- Use object tracking to avoid counting the same panel across multiple video frames
-- Generate summary charts from the CSV output
+- Works best on blue or dark-blue panels shot from above with visible borders.
+- Heavy glare, strong shadows, or panels that blend with the background reduce accuracy.
+- Unique tracking assumes reasonably smooth drone footage. Abrupt cuts or very fast camera rotation can cause the same panel to be counted more than once.
+- Parameter tuning may be needed for significantly different panel colors or camera angles.

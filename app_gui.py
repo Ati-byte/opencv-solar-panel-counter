@@ -137,6 +137,16 @@ class SolarPanelCounterApp:
         )
         if path:
             self.input_path.set(path)
+            self._auto_frame_step(Path(path))
+
+    def _auto_frame_step(self, path: Path) -> None:
+        if path.suffix.lower() not in {".mp4", ".mov", ".avi", ".mkv"}:
+            return
+        cap = cv2.VideoCapture(str(path))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        if fps > 0:
+            self.frame_step.set(str(max(1, round(fps / 3))))
 
     def _start_analysis(self) -> None:
         try:
